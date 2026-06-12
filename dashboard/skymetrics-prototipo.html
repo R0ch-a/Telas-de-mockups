@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skymetrics — General metrics</title>
+<style>
+  :root{
+    --bg:#dcdcdc;
+    --panel:#171815;
+    --card:#242424;
+    --card-border:#32332f;
+    --sidebar:#1d1e1a;
+    --text:#f4f5f6;
+    --text-dim:#9b9ea4;
+    --text-faint:#6e716c;
+    --green:#4cd97b;
+    --green-dim:rgba(76,217,123,.13);
+    --red:#f06a6a;
+    --red-dim:rgba(240,106,106,.13);
+    --gray-line:#8b8e89;
+    --grid:#373834;
+    --hover:#2c2d29;
+    --active:#30312d;
+    --btn:#262724;
+    --btn-hover:#2f302c;
+    --tooltip-bg:#2b2c28;
+    --tooltip-border:#3c3d38;
+    --row-border:#2e2f2b;
+    --row-hover:#2a2b27;
+    --dot-off:#41423d;
+    --bar-off:#3c3d38;
+    --xaxis-hl:#33342f;
+    --radius:14px;
+    font-size:15px;
+  }
+  [data-theme="light"]{
+    --bg:#d2d5d6;
+    --panel:#f2f2f0;
+    --card:#ffffff;
+    --card-border:#e9e9e6;
+    --sidebar:#ffffff;
+    --text:#1a1b19;
+    --text-dim:#63666b;
+    --text-faint:#8e9195;
+    --green:#34c46a;
+    --green-dim:rgba(52,196,106,.12);
+    --red:#e25555;
+    --red-dim:rgba(226,85,85,.1);
+    --gray-line:#c3c6ca;
+    --grid:#e3e3e0;
+    --hover:#f2f2f0;
+    --active:#ececea;
+    --btn:#ffffff;
+    --btn-hover:#f4f4f2;
+    --tooltip-bg:#ffffff;
+    --tooltip-border:#e6e6e3;
+    --row-border:#efefec;
+    --row-hover:#f7f7f5;
+    --dot-off:#dededb;
+    --bar-off:#e4e4e1;
+    --xaxis-hl:#eaeae8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);
+    font-family:"Inter","Segoe UI",system-ui,sans-serif;
+    color:var(--text);
+    padding:28px;
+    min-height:100vh;
+    transition:background .35s ease;
+  }
+  .app{
+    background:var(--panel);
+    border-radius:26px;
+    display:flex;
+    max-width:1620px;
+    margin:0 auto;
+    min-height:calc(100vh - 56px);
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    transition:background .35s ease;
+  }
+  button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:236px;
+    background:var(--sidebar);
+    border:1px solid var(--card-border);
+    border-radius:18px;
+    margin:14px;
+    padding:20px 12px;
+    display:flex;
+    flex-direction:column;
+    flex-shrink:0;
+    transition:width .38s cubic-bezier(.4,0,.2,1), background .35s ease, padding .38s;
+    overflow:hidden;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 22px;min-height:56px}
+  .brand .logo{
+    width:30px;height:30px;border-radius:8px;flex-shrink:0;
+    border:1px solid var(--card-border);
+    display:grid;place-items:center;font-size:13px;
+    background:var(--card);
+  }
+  .brand b{font-size:1.02rem;letter-spacing:.2px;white-space:nowrap;transition:opacity .25s}
+  .hamburger{
+    margin-left:auto;width:26px;height:26px;border-radius:7px;flex-shrink:0;
+    border:1px solid var(--card-border);background:none;color:var(--text-dim);
+    cursor:pointer;display:grid;place-items:center;
+    transition:transform .38s cubic-bezier(.4,0,.2,1), background .15s;
+  }
+  .hamburger:hover{background:var(--hover);color:var(--text)}
+  .hamburger svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+  nav{display:flex;flex-direction:column;gap:2px}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 12px;border-radius:10px;
+    color:var(--text-dim);cursor:pointer;border:none;background:none;
+    font:inherit;font-size:.92rem;text-align:left;width:100%;
+    transition:background .15s,color .15s;
+    white-space:nowrap;
+  }
+  .nav-item svg{width:17px;height:17px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .nav-item .txt{transition:opacity .22s}
+  .nav-item:hover{background:var(--hover);color:var(--text)}
+  .nav-item.active{background:var(--active);color:var(--text)}
+  .sidebar .bottom{margin-top:auto;display:flex;flex-direction:column;gap:2px}
+
+  /* collapsed state */
+  .app.collapsed .sidebar{width:76px;padding:20px 12px}
+  .app.collapsed .brand{padding-left:0;padding-right:0;justify-content:center;gap:0}
+  .app.collapsed .brand b,
+  .app.collapsed .nav-item .txt{opacity:0;width:0;overflow:hidden}
+  .app.collapsed .brand .logo{display:none}
+  .app.collapsed .nav-item{justify-content:center;padding:11px 0;gap:0}
+  .app.collapsed .hamburger{margin:0 auto;transform:rotate(180deg)}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;padding:26px 30px 30px 16px;overflow:auto;min-width:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:14px;flex-wrap:wrap}
+  h1{font-size:1.9rem;font-weight:600;letter-spacing:-.5px}
+  .top-controls{display:flex;gap:10px}
+  .select{position:relative}
+  .select button,.icon-btn{
+    display:flex;align-items:center;gap:8px;
+    background:var(--btn);border:1px solid var(--card-border);
+    color:var(--text);padding:9px 14px;border-radius:11px;
+    font:inherit;font-size:.88rem;cursor:pointer;
+    transition:background .2s;
+  }
+  .select button:hover,.icon-btn:hover{background:var(--btn-hover)}
+  .icon-btn{padding:9px 11px;font-size:1rem;line-height:1}
+  .select .menu{
+    position:absolute;right:0;top:calc(100% + 6px);z-index:30;
+    background:var(--btn);border:1px solid var(--card-border);border-radius:11px;
+    min-width:100%;padding:5px;display:none;box-shadow:0 12px 30px rgba(0,0,0,.25);
+  }
+  .select.open .menu{display:block}
+  .menu div{padding:8px 11px;border-radius:8px;font-size:.86rem;color:var(--text-dim);cursor:pointer;white-space:nowrap}
+  .menu div:hover{background:var(--active);color:var(--text)}
+  .menu div.sel{color:var(--green)}
+  .caret{font-size:.62rem;color:var(--text-dim)}
+
+  /* ---------- Grid ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:14px}
+  .row2{display:grid;grid-template-columns:2.05fr 1fr;gap:14px;margin-bottom:14px}
+  .row3{display:grid;grid-template-columns:.78fr 1.27fr 1fr;gap:14px}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    padding:18px 20px;
+    transition:background .35s ease,border-color .35s ease;
+  }
+  .card h3{font-size:.95rem;font-weight:500;color:var(--text-dim)}
+
+  /* ---------- Load animation ---------- */
+  @keyframes cardIn{
+    from{opacity:0;transform:translateY(18px) scale(.985)}
+    to{opacity:1;transform:none}
+  }
+  .anim-in{animation:cardIn .6s cubic-bezier(.22,.9,.3,1) both}
+
+  /* KPI cards */
+  .kpi .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .badge{font-size:.74rem;font-weight:600;padding:3px 8px;border-radius:20px}
+  .badge.up{background:var(--green-dim);color:var(--green)}
+  .badge.down{background:var(--red-dim);color:var(--red)}
+  .kpi .value{font-size:1.7rem;font-weight:600;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+  .arrow{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:.68rem;flex-shrink:0}
+  .arrow.up{background:var(--green-dim);color:var(--green)}
+  .arrow.down{background:var(--red-dim);color:var(--red)}
+  .kpi .sub{margin-top:12px;font-size:.82rem;color:var(--text-faint)}
+
+  /* Sales & Returns */
+  .sales-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .sales-head .desc{margin-top:8px;font-size:.85rem;color:var(--text-faint)}
+  .legend{display:flex;gap:30px;align-items:center}
+  .legend .item{cursor:pointer;user-select:none}
+  .legend .label{display:flex;align-items:center;gap:7px;font-size:.82rem;color:var(--text-dim)}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .legend .num{display:flex;align-items:center;gap:8px;font-size:2rem;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .legend .item.off{opacity:.35}
+  .chart-wrap{position:relative;margin-top:14px}
+  .chart-wrap svg{width:100%;height:250px;display:block}
+  .tooltip{
+    position:absolute;pointer-events:none;z-index:20;
+    background:var(--tooltip-bg);border:1px solid var(--tooltip-border);border-radius:11px;
+    padding:10px 13px;font-size:.82rem;min-width:150px;
+    box-shadow:0 12px 28px rgba(0,0,0,.22);
+    transform:translate(14px,-110%);
+    opacity:0;transition:opacity .4s;
+  }
+  .tooltip.show{opacity:1}
+  .tooltip .t{color:var(--text-faint);margin-bottom:3px;font-size:.78rem}
+  .tooltip b{font-weight:600;font-size:.9rem}
+  #marker{opacity:0;transition:opacity .4s}
+  #marker.show{opacity:1}
+  .xaxis{display:flex;justify-content:space-between;padding:6px 30px 0 52px;font-size:.82rem;color:var(--text-faint)}
+  .xaxis span{padding:4px 12px;border-radius:9px}
+  .xaxis span.hl{background:var(--xaxis-hl);color:var(--text)}
+
+  /* Conversion funnel — vertical bars */
+  .conv-head{display:flex;justify-content:space-between;align-items:flex-start}
+  .conv-rate{text-align:right}
+  .conv-rate .label{font-size:.82rem;color:var(--text-dim)}
+  .conv-rate .val{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:2rem;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+  .conv-desc{font-size:.85rem;color:var(--text-faint);margin-top:8px}
+  .conv-card{display:flex;flex-direction:column}
+  .funnel{margin-top:auto;display:flex;gap:14px;align-items:flex-end;padding-top:24px}
+  .stage{flex:1;min-width:0}
+  .stage .pct{font-size:.86rem;color:var(--text);font-weight:500;margin-bottom:8px;font-variant-numeric:tabular-nums}
+  .bars{display:flex;gap:4px;align-items:flex-end;height:118px}
+  .bars i{
+    flex:1;max-width:8px;border-radius:5px;background:var(--bar-off);
+    transform-origin:bottom;
+  }
+  .bars i.on{background:var(--green)}
+  @keyframes barIn{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .bars i.grow{animation:barIn .55s cubic-bezier(.3,.9,.3,1) both}
+  .stage .name{font-size:.84rem;color:var(--text-dim);margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stage .count{font-size:.95rem;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+
+  /* Sessions gauge */
+  .gauge-card{display:flex;flex-direction:column}
+  .gauge{position:relative;margin:18px auto 6px;width:200px}
+  .gauge svg{width:200px;height:118px;display:block;overflow:visible}
+  .gauge .center{position:absolute;left:50%;top:78%;transform:translate(-50%,-50%);text-align:center;width:100%}
+  .gauge .center .num{font-size:1.9rem;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .gauge .center .lab{font-size:.8rem;color:var(--text-faint);margin-top:2px}
+  .sess-foot{
+    margin-top:auto;padding-top:16px;border-top:1px dashed var(--grid);
+    display:flex;justify-content:space-between;font-size:.85rem;
+  }
+  .sess-foot span{color:var(--text-dim)}
+  .sess-foot b{font-variant-numeric:tabular-nums}
+
+  /* Traffic sources */
+  .ts-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+  .ts-stats .label{font-size:.8rem;color:var(--text-faint)}
+  .ts-stats .val{font-size:.95rem;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stack{display:flex;height:8px;border-radius:6px;overflow:hidden;gap:3px;margin:20px 0 16px}
+  .stack i{border-radius:6px;transition:flex .4s ease;cursor:pointer}
+  .stack i:hover{filter:brightness(1.15)}
+  .src-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 28px}
+  .src{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--text-dim);padding:3px 0}
+  .src b{margin-left:auto;color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* Region table */
+  .region table{width:100%;border-collapse:collapse;margin-top:14px}
+  .region th{font-size:.8rem;font-weight:500;color:var(--text-faint);text-align:left;padding:8px 4px;border-bottom:1px solid var(--grid)}
+  .region th:nth-child(2){text-align:center}
+  .region th:last-child{text-align:right}
+  .region td{padding:12px 4px;font-size:.88rem;border-bottom:1px solid var(--row-border);font-variant-numeric:tabular-nums}
+  .region tr:last-child td{border-bottom:none}
+  .region td:nth-child(2){text-align:center;color:var(--text-dim)}
+  .region td:last-child{text-align:right;font-weight:600}
+  .region .delta{font-size:.7rem;margin-left:5px}
+  .region .delta.up{color:var(--green)}
+  .region .delta.down{color:var(--red)}
+  .region tbody tr{transition:background .12s}
+  .region tbody tr:hover{background:var(--row-hover)}
+
+  @media(max-width:1280px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .row2,.row3{grid-template-columns:1fr}
+  }
+  @media(max-width:860px){
+    body{padding:10px}
+    .sidebar{display:none}
+    .app{border-radius:16px}
+    .main{padding:20px}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .src-grid{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">📈</div><b>Skymetrics</b>
+      <button class="hamburger" id="hamburger" title="Collapse menu" aria-label="Collapse menu">
+        <svg viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6"/></svg>
+      </button>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg><span class="txt">Home</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span class="txt">AI Assistant</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="txt">Product Types</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="txt">Collections</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg><span class="txt">Inventory</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg><span class="txt">Returns</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18"/></svg><span class="txt">Markets</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/></svg><span class="txt">ABC Analysis</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span class="txt">Reports</span></button>
+    </nav>
+    <div class="bottom">
+      <button class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7M12 17h.01"/></svg><span class="txt">Help &amp; Support</span></button>
+      <button class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg><span class="txt">Settings</span></button>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+    <div class="topbar">
+      <h1>General metrics</h1>
+      <div class="top-controls">
+        <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle light/dark theme">☀️</button>
+        <div class="select" id="periodSel">
+          <button>🗓 <span id="periodLabel">Last 7 days</span> <span class="caret">▼</span></button>
+          <div class="menu">
+            <div data-p="7" class="sel">Last 7 days</div>
+            <div data-p="30">Last 30 days</div>
+            <div data-p="90">Last 90 days</div>
+          </div>
+        </div>
+        <div class="select" id="brandSel">
+          <button><span id="brandLabel">Redondo Brand</span> <span class="caret">▼</span></button>
+          <div class="menu">
+            <div class="sel">Redondo Brand</div>
+            <div>Atlas Store</div>
+            <div>Nova Outlet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="row2">
+      <div class="card" id="salesCard">
+        <div class="sales-head">
+          <div>
+            <h3>Sales &amp; Returns</h3>
+            <p class="desc" id="salesDesc"></p>
+          </div>
+          <div class="legend">
+            <div class="item" id="legSales">
+              <div class="label"><span class="dot" style="background:var(--green)"></span>Total sales</div>
+              <div class="num"><span id="totSales"></span><span class="badge up" id="totSalesB"></span></div>
+            </div>
+            <div class="item" id="legReturns">
+              <div class="label"><span class="dot" style="background:var(--gray-line)"></span>Returns</div>
+              <div class="num"><span id="totReturns"></span><span class="badge down" id="totReturnsB"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <svg id="chart" viewBox="0 0 900 250" preserveAspectRatio="none" aria-label="Sales and returns line chart"></svg>
+          <div class="tooltip" id="tip">
+            <div class="t" id="tipT"></div>
+            <div><b id="tipS"></b></div>
+          </div>
+        </div>
+        <div class="xaxis" id="xaxis"></div>
+      </div>
+
+      <div class="card conv-card">
+        <div class="conv-head">
+          <div>
+            <h3>Sales conversion</h3>
+            <p class="conv-desc">Conversion process from leads to deals</p>
+          </div>
+          <div class="conv-rate">
+            <div class="label">Conversion rate</div>
+            <div class="val"><span id="convRate"></span><span class="badge up" id="convDelta"></span></div>
+          </div>
+        </div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+    </section>
+
+    <section class="row3">
+      <div class="card gauge-card">
+        <h3>Sessions</h3>
+        <div class="gauge">
+          <svg viewBox="0 0 200 118">
+            <path d="M14 104 A 86 86 0 0 1 186 104" fill="none" style="stroke:var(--bar-off)" stroke-width="11" stroke-linecap="round" stroke-dasharray="2 7"/>
+            <path id="gaugeArc" d="M14 104 A 86 86 0 0 1 186 104" fill="none" style="stroke:var(--green)" stroke-width="11" stroke-linecap="round"/>
+          </svg>
+          <div class="center">
+            <div class="num" id="uniqueUsers">0</div>
+            <div class="lab">Unique Users</div>
+          </div>
+        </div>
+        <div class="sess-foot"><span>Total Sessions</span><b id="totSessions">0</b></div>
+      </div>
+
+      <div class="card">
+        <h3>Traffic Sources</h3>
+        <div class="ts-stats" id="tsStats"></div>
+        <div class="stack" id="stack"></div>
+        <div class="src-grid" id="srcGrid"></div>
+      </div>
+
+      <div class="card region">
+        <h3>Sales by Region</h3>
+        <table>
+          <thead><tr><th>Region</th><th>Orders</th><th>Net Revenue</th></tr></thead>
+          <tbody id="regionBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ================= FICTIONAL DATA ================= */
+const DATA = {
+  7: {
+    kpis: [
+      {name:"Profit Margin", value:"€123,927.85", delta:38, sub:"Up 38% this week"},
+      {name:"Orders", value:"2,792", delta:11, sub:"Up 11% this week"},
+      {name:"Avg. Order Value", value:"857", delta:-67, sub:"Down 67% this week"},
+      {name:"Units Sold", value:"1,571", delta:-29, sub:"Down 29% this week"},
+      {name:"Cart Abandonment", value:"835", delta:11, sub:"Up 11% this week"}
+    ],
+    labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+    ticks:[0,500,1000,5000,10000], tickLabels:["0","500","1k","5k","10k"],
+    salesAnchors:  [620,900,2100,1500,4782,2400,4100],
+    returnsAnchors:[420,560,380,650,503,560,610],
+    peak:{day:4, value:4782, label:"14 March 2:39 PM"},
+    seed:7,
+    salesTotal:"4,782", salesDelta:"+7%", returnsTotal:"503", returnsDelta:"-12%",
+    desc:"Total sales up 7%, while returns decreased by 12%",
+    funnel:[ {name:"Leads",count:1500,pct:100},{name:"Add to cart",count:800,pct:53},
+             {name:"Checkout",count:200,pct:13},{name:"Deals",count:150,pct:10} ],
+    convRate:"10%", convDelta:"+7%",
+    sessions:{unique:3271,total:4182},
+    traffic:{
+      stats:[["Marketing Spend","€11,596"],["CPA","€5.4"],["Impressions","7,574,183"],["Clicks","60,784"]],
+      sources:[
+        {n:"Shop",v:3707,c:"#f0b440"},{n:"Direct",v:1490,c:"#4cd97b"},
+        {n:"Instagram",v:979,c:"#3ecfb2"},{n:"Google",v:728,c:"#52b6e8"},
+        {n:"Facebook",v:213,c:"#b06ef5"},{n:"Others",v:38,c:"#e564b8"}
+      ]
+    },
+    regions:[ ["Spain",129,"down","€24,063.90"],["Rest of the world",7,"up","€3,578.18"],
+              ["Europa",129,"up","€24,063.90"],["Mexico",1,"down","€41.08"] ]
+  },
+  30: {
+    kpis: [
+      {name:"Profit Margin", value:"€486,210.32", delta:21, sub:"Up 21% this month"},
+      {name:"Orders", value:"11,438", delta:8, sub:"Up 8% this month"},
+      {name:"Avg. Order Value", value:"842", delta:-3, sub:"Down 3% this month"},
+      {name:"Units Sold", value:"6,490", delta:9, sub:"Up 9% this month"},
+      {name:"Cart Abandonment", value:"3,512", delta:-2, sub:"Down 2% this month"}
+    ],
+    labels:["Week 1","Week 2","Week 3","Week 4"],
+    ticks:[0,1000,5000,10000,20000], tickLabels:["0","1k","5k","10k","20k"],
+    salesAnchors:  [6200,9800,8400,16850],
+    returnsAnchors:[1480,1620,1390,1510],
+    peak:{day:3, value:16850, label:"28 March 6:12 PM"},
+    seed:30,
+    salesTotal:"19,540", salesDelta:"+12%", returnsTotal:"2,104", returnsDelta:"-5%",
+    desc:"Total sales up 12%, while returns decreased by 5%",
+    funnel:[ {name:"Leads",count:6200,pct:100},{name:"Add to cart",count:2980,pct:48},
+             {name:"Checkout",count:870,pct:14},{name:"Deals",count:560,pct:9} ],
+    convRate:"9%", convDelta:"+4%",
+    sessions:{unique:13904,total:17630},
+    traffic:{
+      stats:[["Marketing Spend","€47,120"],["CPA","€5.1"],["Impressions","30,118,540"],["Clicks","248,902"]],
+      sources:[
+        {n:"Shop",v:15080,c:"#f0b440"},{n:"Direct",v:6120,c:"#4cd97b"},
+        {n:"Instagram",v:4030,c:"#3ecfb2"},{n:"Google",v:2960,c:"#52b6e8"},
+        {n:"Facebook",v:870,c:"#b06ef5"},{n:"Others",v:152,c:"#e564b8"}
+      ]
+    },
+    regions:[ ["Spain",512,"up","€96,420.55"],["Rest of the world",38,"up","€14,212.30"],
+              ["Europa",486,"down","€90,118.72"],["Mexico",9,"up","€388.60"] ]
+  },
+  90: {
+    kpis: [
+      {name:"Profit Margin", value:"€1,392,808.10", delta:15, sub:"Up 15% this quarter"},
+      {name:"Orders", value:"33,261", delta:6, sub:"Up 6% this quarter"},
+      {name:"Avg. Order Value", value:"811", delta:1, sub:"Up 1% this quarter"},
+      {name:"Units Sold", value:"18,930", delta:7, sub:"Up 7% this quarter"},
+      {name:"Cart Abandonment", value:"10,228", delta:3, sub:"Up 3% this quarter"}
+    ],
+    labels:["Jan","Feb","Mar"],
+    ticks:[0,5000,10000,30000,60000], tickLabels:["0","5k","10k","30k","60k"],
+    salesAnchors:  [22400,38200,56120],
+    returnsAnchors:[5120,4870,4310],
+    peak:{day:2, value:56120, label:"31 March 4:45 PM"},
+    seed:90,
+    salesTotal:"56,120", salesDelta:"+21%", returnsTotal:"4,310", returnsDelta:"-11%",
+    desc:"Total sales up 21%, while returns decreased by 11%",
+    funnel:[ {name:"Leads",count:18400,pct:100},{name:"Add to cart",count:8100,pct:44},
+             {name:"Checkout",count:2390,pct:13},{name:"Deals",count:1470,pct:8} ],
+    convRate:"8%", convDelta:"+2%",
+    sessions:{unique:41280,total:52960},
+    traffic:{
+      stats:[["Marketing Spend","€139,440"],["CPA","€4.9"],["Impressions","88,902,114"],["Clicks","731,205"]],
+      sources:[
+        {n:"Shop",v:43900,c:"#f0b440"},{n:"Direct",v:17800,c:"#4cd97b"},
+        {n:"Instagram",v:11740,c:"#3ecfb2"},{n:"Google",v:8620,c:"#52b6e8"},
+        {n:"Facebook",v:2530,c:"#b06ef5"},{n:"Others",v:441,c:"#e564b8"}
+      ]
+    },
+    regions:[ ["Spain",1490,"up","€278,310.00"],["Rest of the world",112,"up","€41,808.20"],
+              ["Europa",1402,"up","€260,860.90"],["Mexico",31,"down","€1,442.55"] ]
+  }
+};
+
+const fmt = n => n.toLocaleString("en-US");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let period = 7;
+let show = {sales:true, returns:true};
+
+/* ================= KPI CARDS ================= */
+function renderKpis(d){
+  document.getElementById("kpis").innerHTML = d.kpis.map(k=>{
+    const positive = k.delta >= 0;
+    return `<div class="card kpi">
+      <div class="head"><h3>${k.name}</h3>
+        <span class="badge ${positive?"up":"down"}">${positive?"+":""}${k.delta}%</span></div>
+      <div class="value">${k.value}
+        <span class="arrow ${positive?"up":"down"}">${positive?"↑":"↓"}</span></div>
+      <div class="sub">${k.sub}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ================= LINE CHART ================= */
+const W=900,H=250,PADL=50,PADR=16,PADT=12,PADB=10;
+const PTS_PER_DAY=14;
+
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+function genSeries(anchors, seed, noiseAmp){
+  const rnd=mulberry32(seed);
+  const n=anchors.length;
+  const total=(n-1)*PTS_PER_DAY+1;
+  const out=[];
+  const phase1=rnd()*6.28, phase2=rnd()*6.28;
+  for(let i=0;i<total;i++){
+    const t=i/(total-1)*(n-1);
+    const k=Math.min(Math.floor(t),n-2);
+    const u=t-k;
+    const p0=anchors[Math.max(k-1,0)], p1=anchors[k], p2=anchors[k+1], p3=anchors[Math.min(k+2,n-1)];
+    const u2=u*u, u3=u2*u;
+    let v=0.5*((2*p1)+(-p0+p2)*u+(2*p0-5*p1+4*p2-p3)*u2+(-p0+3*p1-3*p2+p3)*u3);
+    const w = Math.sin(i*0.9+phase1)*0.55 + Math.sin(i*0.37+phase2)*0.45 + (rnd()-0.5)*0.9;
+    const anchorDist = Math.min(u, 1-u);
+    v += w * noiseAmp * v * Math.min(anchorDist*4,1);
+    out.push(Math.max(v, anchors[0]*0.1, 30));
+  }
+  return out;
+}
+
+function makeYScale(ticks){
+  const n=ticks.length;
+  const span=H-PADT-PADB;
+  return v=>{
+    let i=0;
+    while(i<n-1 && v>ticks[i+1]) i++;
+    i=Math.min(i,n-2);
+    const f=(v-ticks[i])/(ticks[i+1]-ticks[i]);
+    const pos=(i+Math.min(Math.max(f,0),1.08))/(n-1);
+    return PADT+span*(1-pos);
+  };
+}
+
+let series={sales:[],returns:[]}, xs=[], yScale=null, pinnedIdx=0;
+
+function buildPath(values){
+  let d="";
+  values.forEach((v,i)=>{
+    const px=xs[i], py=yScale(v);
+    d+= i===0 ? `M${px.toFixed(1)},${py.toFixed(1)}` : ` L${px.toFixed(1)},${py.toFixed(1)}`;
+  });
+  return d;
+}
+
+function renderChart(d, animate){
+  const svg=document.getElementById("chart");
+  series.sales=genSeries(d.salesAnchors,d.seed,0.16);
+  series.returns=genSeries(d.returnsAnchors,d.seed+1,0.13);
+  const total=series.sales.length;
+  xs=Array.from({length:total},(_,i)=>PADL+(W-PADL-PADR)*i/(total-1));
+  yScale=makeYScale(d.ticks);
+
+  pinnedIdx=d.peak.day*PTS_PER_DAY;
+  series.sales[pinnedIdx]=d.peak.value;
+
+  let g="";
+  d.ticks.forEach((t,i)=>{
+    const yy=PADT+(H-PADT-PADB)*(1-i/(d.ticks.length-1));
+    g+=`<line x1="${PADL}" y1="${yy}" x2="${W-PADR}" y2="${yy}" style="stroke:var(--grid)" stroke-width="1" stroke-dasharray="3 6"/>`;
+    g+=`<text x="${PADL-10}" y="${yy+4}" style="fill:var(--text-faint)" font-size="12" text-anchor="end">${d.tickLabels[i]}</text>`;
+  });
+
+  let lines="";
+  if(show.returns) lines+=`<path class="line" d="${buildPath(series.returns)}" fill="none" style="stroke:var(--gray-line)" stroke-width="1.8" stroke-linejoin="round"/>`;
+  if(show.sales)   lines+=`<path class="line" d="${buildPath(series.sales)}" fill="none" style="stroke:var(--green)" stroke-width="2.2" stroke-linejoin="round"/>`;
+
+  svg.innerHTML=g+lines+`<g id="marker"></g>`;
+
+  document.getElementById("xaxis").innerHTML =
+    d.labels.map((l,i)=>`<span class="${i===d.peak.day?"hl":""}">${l}</span>`).join("");
+
+  /* line-drawing animation, then reveal marker + tooltip */
+  const markerG=document.getElementById("marker");
+  const tipEl=document.getElementById("tip");
+  if(animate && !reducedMotion){
+    markerG.classList.remove("show"); tipEl.classList.remove("show");
+    svg.querySelectorAll("path.line").forEach((p,i)=>{
+      const len=p.getTotalLength();
+      p.style.strokeDasharray=len;
+      p.style.strokeDashoffset=len;
+      p.animate([{strokeDashoffset:len},{strokeDashoffset:0}],
+        {duration:1100, delay:250+i*120, easing:"cubic-bezier(.45,0,.25,1)", fill:"forwards"});
+    });
+    setTimeout(()=>{drawMarker(pinnedIdx,true); markerG.classList.add("show"); tipEl.classList.add("show");},1450);
+  }else{
+    drawMarker(pinnedIdx,true);
+    markerG.classList.add("show"); tipEl.classList.add("show");
+  }
+}
+
+function drawMarker(idx,pinned){
+  const d=DATA[period];
+  const marker=document.getElementById("marker");
+  if(!show.sales){ marker.innerHTML=""; tip.classList.remove("show"); return; }
+  tip.classList.add("show");
+  const px=xs[idx], sy=yScale(series.sales[idx]);
+  let html=`<line x1="${px}" y1="${sy}" x2="${px}" y2="${H-PADB}" style="stroke:var(--text-faint)" stroke-width="1.2" opacity=".6"/>`;
+  if(show.returns){
+    const ry=yScale(series.returns[idx]);
+    html+=`<circle cx="${px}" cy="${ry}" r="4.5" style="fill:var(--gray-line);stroke:var(--card)" stroke-width="3"/>`;
+  }
+  html+=`<circle cx="${px}" cy="${sy}" r="5.5" style="fill:var(--green);stroke:var(--card)" stroke-width="3.5"/>`;
+  marker.innerHTML=html;
+
+  const svg=document.getElementById("chart");
+  const r=svg.getBoundingClientRect();
+  tip.style.left=(px/W*r.width)+"px";
+  tip.style.top=(sy/H*r.height)+"px";
+  if(pinned){
+    document.getElementById("tipT").textContent=d.peak.label;
+    document.getElementById("tipS").textContent=fmt(d.peak.value)+" sales";
+  }else{
+    const day=Math.round(idx/PTS_PER_DAY);
+    const hour=8+Math.round((idx%PTS_PER_DAY)/PTS_PER_DAY*12);
+    document.getElementById("tipT").textContent=d.labels[Math.min(day,d.labels.length-1)]+` ${hour}:00`;
+    document.getElementById("tipS").textContent=fmt(Math.round(series.sales[idx]))+" sales";
+  }
+  tip.style.transform = px > W*0.78 ? "translate(calc(-100% - 14px),-110%)" : "translate(14px,-110%)";
+}
+
+const chartEl=document.getElementById("chart");
+const tip=document.getElementById("tip");
+chartEl.addEventListener("mousemove",e=>{
+  const r=chartEl.getBoundingClientRect();
+  const mx=(e.clientX-r.left)/r.width*W;
+  let best=0,bd=1e9;
+  xs.forEach((x,i)=>{const dd=Math.abs(x-mx); if(dd<bd){bd=dd;best=i;}});
+  drawMarker(best,best===pinnedIdx);
+});
+chartEl.addEventListener("mouseleave",()=>drawMarker(pinnedIdx,true));
+
+document.getElementById("legSales").onclick=()=>{show.sales=!show.sales;
+  document.getElementById("legSales").classList.toggle("off",!show.sales); renderChart(DATA[period],false);};
+document.getElementById("legReturns").onclick=()=>{show.returns=!show.returns;
+  document.getElementById("legReturns").classList.toggle("off",!show.returns); renderChart(DATA[period],false);};
+
+/* ================= FUNNEL (vertical bars) ================= */
+const BARS_PER_STAGE=7;
+function renderFunnel(d, animate){
+  const maxH=118, minH=12;
+  const html=d.funnel.map((f,si)=>{
+    const next=d.funnel[si+1] ? d.funnel[si+1].pct : f.pct*0.6;
+    const bars=Array.from({length:BARS_PER_STAGE},(_,k)=>{
+      const p=f.pct + (next-f.pct)*(k/BARS_PER_STAGE);
+      const h=Math.max(p/100*maxH, minH);
+      const delay=(si*BARS_PER_STAGE+k)*28+300;
+      const cls=(k===0?"on":"")+(animate&&!reducedMotion?" grow":"");
+      return `<i class="${cls}" style="height:${h.toFixed(0)}px;animation-delay:${delay}ms"></i>`;
+    }).join("");
+    return `<div class="stage">
+      <div class="pct">${f.pct}%</div>
+      <div class="bars">${bars}</div>
+      <div class="name">${f.name}</div>
+      <div class="count">${fmt(f.count)}</div>
+    </div>`;
+  }).join("");
+  document.getElementById("funnel").innerHTML=html;
+  document.getElementById("convRate").textContent=d.convRate;
+  document.getElementById("convDelta").textContent=d.convDelta;
+}
+
+/* ================= GAUGE + COUNTERS ================= */
+const arc=document.getElementById("gaugeArc");
+const ARCLEN=Math.PI*86;
+arc.style.strokeDasharray=ARCLEN;
+function animateCount(el,target,dur=800){
+  if(reducedMotion){el.textContent=fmt(target);return;}
+  const start=performance.now();
+  function step(t){
+    const k=Math.min((t-start)/dur,1);
+    el.textContent=fmt(Math.round(target*(1-Math.pow(1-k,3))));
+    if(k<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function renderSessions(d){
+  const frac=d.sessions.unique/d.sessions.total;
+  arc.style.transition=reducedMotion?"none":"stroke-dashoffset .9s cubic-bezier(.4,0,.2,1) .4s";
+  arc.style.strokeDashoffset=ARCLEN;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    arc.style.strokeDashoffset=ARCLEN*(1-frac);
+  }));
+  animateCount(document.getElementById("uniqueUsers"),d.sessions.unique);
+  animateCount(document.getElementById("totSessions"),d.sessions.total);
+}
+
+/* ================= TRAFFIC ================= */
+function renderTraffic(d){
+  document.getElementById("tsStats").innerHTML=d.traffic.stats.map(
+    ([l,v])=>`<div><div class="label">${l}</div><div class="val">${v}</div></div>`).join("");
+  const total=d.traffic.sources.reduce((a,s)=>a+s.v,0);
+  document.getElementById("stack").innerHTML=d.traffic.sources.map(
+    s=>`<i style="flex:${s.v/total};background:${s.c}" title="${s.n}: ${fmt(s.v)}"></i>`).join("");
+  const cell=s=>`<div class="src"><span class="dot" style="background:${s.c}"></span>${s.n}<b>${fmt(s.v)}</b></div>`;
+  const order=[0,2,4,1,3,5].map(i=>d.traffic.sources[i]);
+  document.getElementById("srcGrid").innerHTML=order.map(cell).join("");
+}
+
+/* ================= REGIONS ================= */
+function renderRegions(d){
+  document.getElementById("regionBody").innerHTML=d.regions.map(
+    ([r,o,dir,rev])=>`<tr><td>${r}</td>
+      <td>${fmt(o)}<span class="delta ${dir}">${dir==="up"?"↑":"↓"}</span></td>
+      <td>${rev}</td></tr>`).join("");
+}
+
+/* ================= SALES HEADER ================= */
+function renderSalesHeader(d){
+  document.getElementById("totSales").textContent=d.salesTotal;
+  document.getElementById("totSalesB").textContent=d.salesDelta;
+  document.getElementById("totReturns").textContent=d.returnsTotal;
+  document.getElementById("totReturnsB").textContent=d.returnsDelta;
+  document.getElementById("salesDesc").textContent=d.desc;
+}
+
+/* ================= CARD ENTRANCE ANIMATION ================= */
+function animateCards(){
+  if(reducedMotion) return;
+  document.querySelectorAll(".main .card").forEach((c,i)=>{
+    c.classList.remove("anim-in");
+    void c.offsetWidth; /* reflow to restart animation */
+    c.style.animationDelay=(i*65)+"ms";
+    c.classList.add("anim-in");
+  });
+}
+
+/* ================= RENDER ALL ================= */
+function renderAll(animate){
+  const d=DATA[period];
+  renderKpis(d); renderSalesHeader(d); renderChart(d,animate);
+  renderFunnel(d,animate); renderSessions(d); renderTraffic(d); renderRegions(d);
+  if(animate) animateCards();
+}
+renderAll(true);
+window.addEventListener("resize",()=>drawMarker(pinnedIdx,true));
+
+/* ================= THEME TOGGLE (white mode) ================= */
+const themeBtn=document.getElementById("themeBtn");
+themeBtn.onclick=()=>{
+  const root=document.documentElement;
+  const light=root.dataset.theme!=="light";
+  root.dataset.theme=light?"light":"dark";
+  themeBtn.textContent=light?"🌙":"☀️";
+  themeBtn.title=light?"Switch to dark mode":"Switch to light mode";
+};
+
+/* ================= SIDEBAR COLLAPSE ================= */
+document.getElementById("hamburger").onclick=()=>{
+  document.getElementById("app").classList.toggle("collapsed");
+};
+
+/* ================= DROPDOWNS ================= */
+function setupSelect(id,onPick){
+  const el=document.getElementById(id);
+  el.querySelector("button").onclick=e=>{e.stopPropagation();
+    document.querySelectorAll(".select.open").forEach(s=>s!==el&&s.classList.remove("open"));
+    el.classList.toggle("open");};
+  el.querySelectorAll(".menu div").forEach(opt=>opt.onclick=()=>{
+    el.querySelectorAll(".menu div").forEach(o=>o.classList.remove("sel"));
+    opt.classList.add("sel"); el.classList.remove("open"); onPick(opt);
+  });
+}
+setupSelect("periodSel",opt=>{
+  period=+opt.dataset.p;
+  document.getElementById("periodLabel").textContent=opt.textContent;
+  renderAll(true);
+});
+setupSelect("brandSel",opt=>{
+  document.getElementById("brandLabel").textContent=opt.textContent;
+});
+document.addEventListener("click",()=>document.querySelectorAll(".select.open")
+  .forEach(s=>s.classList.remove("open")));
+
+/* ================= SIDEBAR NAV ================= */
+document.querySelectorAll("#nav .nav-item").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#nav .nav-item").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+});
+</script>
+</body>
+</html>

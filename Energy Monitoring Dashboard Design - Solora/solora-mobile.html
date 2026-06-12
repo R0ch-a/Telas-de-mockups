@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Solora — Solar Monitoring</title>
+<style>
+  :root{
+    --bg:#e9e7e2;
+    --screen:#f4f3f0;
+    --card:#ffffff;
+    --card-soft:#fbfaf7;
+    --border:#ecece7;
+    --text:#191a18;
+    --dim:#8e9095;
+    --faint:#b4b6ba;
+    --amber:#f0b440;
+    --amber-deep:#e09c2e;
+    --amber-soft:#faf0d8;
+    --green:#1fa45b;
+    --red:#e0564f;
+    --red-soft:#fdeceb;
+    --radius:22px;
+    --nav-h:86px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    font-family:"Inter","Segoe UI",system-ui,sans-serif;
+    color:var(--text);
+    display:flex;justify-content:center;
+    overflow:hidden;
+  }
+  /* phone shell on desktop, full screen on mobile */
+  .phone{
+    width:100%;max-width:430px;height:100dvh;max-height:100dvh;
+    background:var(--screen);
+    position:relative;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  @media(min-width:520px){
+    body{align-items:center;padding:24px 0}
+    .phone{
+      height:min(900px, calc(100dvh - 48px));border-radius:42px;
+      box-shadow:0 30px 80px rgba(0,0,0,.28), 0 0 0 10px #1a1a1a, 0 0 0 12px #3a3a3a;
+    }
+  }
+
+  /* warm gradient glow at the bottom of every screen */
+  .screen::after{
+    content:"";position:fixed;left:0;right:0;bottom:0;height:34%;
+    background:linear-gradient(to top,#f3ddae 0%,rgba(243,221,174,0) 100%);
+    pointer-events:none;z-index:0;
+  }
+  .phone{isolation:isolate}
+  .screen::after{position:absolute}
+
+  /* ---------- screens ---------- */
+  .screen{
+    position:absolute;inset:0;
+    overflow-y:auto;overflow-x:hidden;
+    padding:18px 18px calc(var(--nav-h) + 24px);
+    opacity:0;pointer-events:none;transform:translateX(26px);
+    transition:opacity .32s ease, transform .32s cubic-bezier(.3,.8,.3,1);
+    scrollbar-width:none;
+  }
+  .screen::-webkit-scrollbar{display:none}
+  .screen.active{opacity:1;pointer-events:auto;transform:none;z-index:1}
+  .screen.full{padding-bottom:24px}
+
+  /* entrance stagger */
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .screen.active .anim{animation:rise .5s cubic-bezier(.25,.9,.3,1) both}
+  .screen.active .anim:nth-child(2){animation-delay:.06s}
+  .screen.active .anim:nth-child(3){animation-delay:.12s}
+  .screen.active .anim:nth-child(4){animation-delay:.18s}
+  .screen.active .anim:nth-child(5){animation-delay:.24s}
+  .screen.active .anim:nth-child(6){animation-delay:.3s}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ---------- shared UI ---------- */
+  .topbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;min-height:48px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.25rem}
+  .logo .mark{width:30px;height:30px;display:grid;place-items:center}
+  .iconbtn{
+    width:46px;height:46px;border-radius:16px;border:none;cursor:pointer;
+    background:var(--card);box-shadow:0 2px 10px rgba(0,0,0,.05);
+    display:grid;place-items:center;position:relative;flex-shrink:0;
+  }
+  .iconbtn svg{width:19px;height:19px;stroke:var(--text);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .iconbtn .dot{position:absolute;top:11px;right:12px;width:7px;height:7px;border-radius:50%;background:#f04438;border:1.5px solid #fff}
+  .avatar{
+    width:46px;height:46px;border-radius:16px;background:var(--amber);
+    display:grid;place-items:center;font-weight:700;color:#fff;font-size:.95rem;flex-shrink:0;
+  }
+  .spacer{flex:1}
+  .card{
+    background:var(--card);border-radius:var(--radius);
+    padding:18px;box-shadow:0 2px 14px rgba(40,35,20,.05);
+    position:relative;z-index:1;
+  }
+  .card-title{display:flex;align-items:center;gap:8px;font-size:.92rem;color:var(--text);font-weight:500}
+  .card-title svg{width:16px;height:16px;stroke:var(--dim);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .big{font-size:2rem;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .big small{font-size:.95rem;font-weight:500;color:var(--dim);letter-spacing:0;margin-left:4px}
+  .chip{font-size:.82rem;font-weight:600}
+  .chip.up{color:var(--green)}
+  .chip.down{color:var(--red)}
+  h1.page{font-size:1.9rem;font-weight:700;letter-spacing:-.6px}
+
+  /* ---------- bottom nav ---------- */
+  .navbar{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;gap:8px;z-index:40;
+    background:rgba(255,255,255,.55);backdrop-filter:blur(14px);
+    padding:8px;border-radius:24px;box-shadow:0 10px 30px rgba(0,0,0,.12);
+    transition:transform .35s, opacity .35s;
+  }
+  .navbar.hidden{transform:translate(-50%,140%);opacity:0;pointer-events:none}
+  .navbar button{
+    width:58px;height:58px;border-radius:18px;border:none;cursor:pointer;
+    background:transparent;display:grid;place-items:center;
+    transition:background .2s, box-shadow .2s;
+  }
+  .navbar button svg{width:21px;height:21px;stroke:#a9aaac;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+  .navbar button.on{background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.1)}
+  .navbar button.on svg{stroke:var(--text)}
+
+  /* ---------- ONBOARDING ---------- */
+  .ob-dots{display:flex;gap:7px}
+  .ob-dots i{width:8px;height:8px;border-radius:50%;background:#dddcd7;transition:background .3s}
+  .ob-dots i.on{background:var(--text)}
+  .ob h1{font-size:2.4rem;font-weight:700;letter-spacing:-1px;line-height:1.12;margin:18px 0 14px}
+  .ob p{color:var(--dim);font-size:.95rem;line-height:1.55;max-width:300px}
+  .cta{
+    width:100%;padding:18px;border:none;border-radius:18px;cursor:pointer;
+    background:#141513;color:#fff;font:inherit;font-size:1rem;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    box-shadow:0 14px 30px rgba(0,0,0,.22);
+    transition:transform .15s;
+    position:relative;z-index:2;
+  }
+  .cta:active{transform:scale(.97)}
+  .ob-bottom{position:absolute;left:18px;right:18px;bottom:26px;z-index:5;display:flex;flex-direction:column;gap:10px}
+  .cta.light{background:rgba(255,255,255,.92);color:var(--text);box-shadow:0 10px 26px rgba(0,0,0,.12);backdrop-filter:blur(8px)}
+  .ob-photo{position:absolute;left:0;right:0;bottom:0;top:295px;z-index:0;overflow:hidden}
+  .ob-photo img{width:100%;height:100%;object-fit:cover;object-position:center 24%}
+  .ob-photo::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom,var(--screen),rgba(244,243,240,0) 26%,rgba(244,243,240,0) 70%,rgba(243,221,174,.45));}
+  .perf-img{width:46%;height:178px;object-fit:cover;object-position:58% 12%;margin-top:-18px;
+    mask-image:linear-gradient(to bottom,#000 62%,transparent);
+    -webkit-mask-image:linear-gradient(to bottom,#000 62%,transparent);}
+
+  /* house illustration */
+  .house{margin:26px -18px 0;position:relative;z-index:0}
+  .house svg{width:100%;display:block}
+  .float-card{
+    position:absolute;border-radius:18px;background:rgba(255,255,255,.82);
+    backdrop-filter:blur(10px);box-shadow:0 12px 30px rgba(0,0,0,.12);
+    padding:14px 16px;z-index:3;
+  }
+  .float-card .row{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--text);font-weight:500}
+  .float-card .row svg{width:15px;height:15px;stroke:var(--dim);fill:none;stroke-width:1.8}
+  .float-card .val{font-size:1.6rem;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .float-card .val small{font-size:.85rem;color:var(--dim);font-weight:500}
+  .float-card .val .chip{margin-left:10px;font-size:.8rem}
+
+  /* electricity ruler */
+  .rate-wrap{margin-top:8vh;text-align:center;position:relative;z-index:2}
+  .rate-val{font-size:3rem;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+  .rate-val small{font-size:1.2rem;color:var(--dim);font-weight:500}
+  .ruler{
+    margin-top:38px;height:84px;position:relative;cursor:grab;touch-action:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  .ruler:active{cursor:grabbing}
+  .ruler .ticks{
+    position:absolute;inset:0;
+    background-image:repeating-linear-gradient(to right,
+      transparent 0 7px, #d8d6d0 7px 9px, transparent 9px 16px),
+      repeating-linear-gradient(to right,
+      transparent 0 71px, #b9b7b1 71px 73px, transparent 73px 80px);
+    background-size:80px 36px, 80px 58px;
+    background-position:center;background-repeat:repeat-x;
+    mask-image:linear-gradient(to right,transparent,#000 18%,#000 82%,transparent);
+    -webkit-mask-image:linear-gradient(to right,transparent,#000 18%,#000 82%,transparent);
+  }
+  .ruler .needle{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:2.5px;height:84px;background:var(--text);border-radius:2px;
+  }
+
+  /* ---------- HOME ---------- */
+  .status{display:flex;align-items:center;gap:7px;color:var(--green);font-size:.92rem;font-weight:600;margin-top:6px}
+  .status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .flow{position:relative;margin:6px -18px 0;z-index:0;height:352px;overflow:hidden}
+  .flow img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 12%}
+  .flow::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(to bottom,var(--screen) 0,rgba(244,243,240,0) 18%,rgba(244,243,240,0) 80%,var(--screen) 100%);}
+  .flow svg.links{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+  .node{
+    position:absolute;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+    border-radius:16px;box-shadow:0 8px 22px rgba(0,0,0,.1);
+    padding:10px 14px;text-align:center;z-index:2;
+    transition:transform .2s;
+  }
+  .node:active{transform:scale(.95)}
+  .node .ic{width:22px;height:22px;margin:0 auto 4px;display:grid;place-items:center}
+  .node .ic svg{width:18px;height:18px;stroke:var(--amber-deep);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .node b{font-size:.95rem;font-variant-numeric:tabular-nums}
+  .node b small{font-weight:500;color:var(--dim);font-size:.78rem}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .stat-mini .label{display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--text);font-weight:500}
+  .stat-mini .label svg{width:14px;height:14px;stroke:var(--dim);fill:none;stroke-width:1.8}
+  .stat-mini .val{margin-top:10px;font-size:1.55rem;font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+  .stat-mini .val small{font-size:.82rem;color:var(--dim);font-weight:500}
+  .alerts{margin-top:14px}
+  .alert-row{display:flex;align-items:center;gap:12px;margin-top:14px}
+  .alert-ic{
+    width:38px;height:38px;border-radius:13px;background:var(--red-soft);
+    display:grid;place-items:center;flex-shrink:0;
+  }
+  .alert-ic svg{width:17px;height:17px;stroke:var(--red);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .alert-row .t1{font-size:.8rem;color:var(--dim)}
+  .alert-row .t2{font-size:1rem;font-weight:600;margin-top:1px}
+  .refresh{margin-left:auto;background:none;border:none;cursor:pointer}
+  .refresh svg{width:17px;height:17px;stroke:var(--faint);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .5s}
+  .refresh.spin svg{transform:rotate(360deg)}
+
+  /* ---------- SOLAR ---------- */
+  .tabs{
+    display:flex;background:rgba(255,255,255,.6);border-radius:16px;padding:5px;
+    margin-bottom:14px;position:relative;z-index:1;
+  }
+  .tabs button{
+    flex:1;padding:11px 0;border:none;border-radius:12px;background:none;cursor:pointer;
+    font:inherit;font-size:.85rem;font-weight:600;color:var(--dim);
+    transition:background .2s,color .2s,box-shadow .2s;
+  }
+  .tabs button.on{background:#fff;color:var(--text);box-shadow:0 5px 14px rgba(0,0,0,.08)}
+  .conf{font-size:.85rem;color:var(--dim)}
+  .conf b{color:var(--green);font-weight:600}
+  .bars-chart{display:flex;gap:9px;align-items:flex-end;height:170px;margin-top:18px}
+  .bcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;border-radius:9px;overflow:hidden;background:linear-gradient(to bottom,rgba(0,0,0,.025),rgba(0,0,0,.06));position:relative}
+  .bcol .fill{
+    background:linear-gradient(to bottom,rgba(240,180,64,.55),rgba(240,180,64,.18));
+    border-top:2.5px solid var(--amber-deep);
+    transform-origin:bottom;
+  }
+  .bcol.hl{outline:2px solid var(--amber-deep);outline-offset:-2px}
+  @keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .screen.active .bcol .fill{animation:growY .7s cubic-bezier(.3,.9,.3,1) both}
+  .xlabels{display:flex;gap:9px;margin-top:10px}
+  .xlabels span{flex:1;text-align:center;font-size:.74rem;color:var(--faint);font-variant-numeric:tabular-nums}
+  .xlabels span.hl{color:var(--text);font-weight:700}
+  .scrub{
+    margin-top:12px;height:34px;position:relative;cursor:grab;touch-action:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  .scrub .ticks{
+    position:absolute;inset:0;
+    background-image:repeating-linear-gradient(to right,transparent 0 6px,#d5d3cd 6px 7.5px,transparent 7.5px 13px);
+    background-position:left center;background-size:13px 16px;background-repeat:repeat-x;
+  }
+  .scrub .cursor{position:absolute;top:50%;transform:translate(-50%,-50%);width:2.5px;height:30px;background:var(--text);border-radius:2px}
+  .climate-stats{display:flex;gap:14px;align-items:center;font-size:.82rem;color:var(--dim);flex-wrap:wrap}
+  .climate-stats span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .climate-stats svg{width:14px;height:14px;stroke:var(--faint);fill:none;stroke-width:1.8}
+  .line-chart{margin-top:14px;position:relative}
+  .line-chart svg{width:100%;height:130px;display:block}
+
+  /* ---------- DEVICE / PERFORMANCE ---------- */
+  .perf-head{display:flex;align-items:flex-start;justify-content:space-between;position:relative;z-index:1}
+  .perf-label{color:var(--dim);font-size:1rem}
+  .perf-val{font-size:3.4rem;font-weight:700;letter-spacing:-2px;line-height:1}
+  .perf-val small{font-size:1.4rem;font-weight:600;color:var(--text)}
+  .kw-bars{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.95rem;font-weight:600}
+  .kw-bars small{color:var(--dim);font-weight:500}
+  .kw-bars .segs{display:flex;gap:2.5px}
+  .kw-bars .segs i{width:4px;height:15px;border-radius:2px;background:#dcdad4;transform:skewX(-12deg)}
+  .kw-bars .segs i.on{background:var(--green)}
+  .legend2{display:flex;gap:16px;font-size:.82rem;color:var(--dim);align-items:center}
+  .legend2 span{display:flex;align-items:center;gap:6px}
+  .legend2 i{width:7px;height:7px;border-radius:50%}
+  .sel-today{
+    display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;
+    font:inherit;font-size:.92rem;font-weight:600;color:var(--text);
+  }
+  .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+
+  /* ---------- INSIGHTS ---------- */
+  .roi-track{position:relative;margin-top:34px}
+  .roi-mark{
+    position:absolute;top:-26px;left:62%;transform:translateX(-50%);
+    font-size:.88rem;font-weight:700;font-variant-numeric:tabular-nums;
+    transition:left 1s cubic-bezier(.3,.9,.3,1);white-space:nowrap;
+  }
+  .roi-bar{height:10px;border-radius:6px;background:repeating-linear-gradient(45deg,#eceae5 0 6px,#f4f2ee 6px 12px);overflow:visible;position:relative}
+  .roi-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(to right,#f4cf7f,var(--amber-deep));transition:width 1s cubic-bezier(.3,.9,.3,1);position:relative}
+  .roi-bar i::after{
+    content:"";position:absolute;right:-2px;top:-5px;width:4px;height:20px;
+    border-radius:3px;background:var(--amber-deep);box-shadow:0 2px 6px rgba(224,156,46,.5);
+  }
+  .roi-scale{display:flex;justify-content:space-between;font-size:.8rem;color:var(--dim);margin-top:10px;font-variant-numeric:tabular-nums}
+  .payback-bars{display:flex;gap:9px;align-items:flex-end;height:130px;margin-top:18px}
+  .pb{flex:1;height:100%;border-radius:8px;position:relative;overflow:hidden;background:repeating-linear-gradient(45deg,#f0eee9 0 5px,#f8f6f2 5px 10px)}
+  .pb .cap{position:absolute;left:0;right:0;bottom:0;border-radius:8px;background:linear-gradient(to bottom,#f3c977,#eda93a);transform-origin:bottom}
+  .pb .band{
+    position:absolute;left:0;right:0;background:#c8e6d0;border-top:3px solid #5cb578;
+    border-radius:7px;transform-origin:bottom;
+  }
+  @keyframes bandIn{from{opacity:0;transform:scaleY(.4)}to{opacity:1;transform:scaleY(1)}}
+  .screen.active .pb .cap,.screen.active .pb .band{animation:bandIn .55s cubic-bezier(.3,.9,.3,1) both}
+
+  /* ---------- SETTINGS (battery dial) ---------- */
+  .dial-wrap{display:flex;flex-direction:column;align-items:center;padding:14px 0 4px;position:relative;z-index:1}
+  .dial{position:relative;width:270px;height:270px;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+  .dial:active{cursor:grabbing}
+  .dial svg{width:100%;height:100%;display:block}
+  .dial .center{
+    position:absolute;inset:36px;border-radius:50%;background:#fff;
+    box-shadow:0 14px 40px rgba(0,0,0,.1);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .dial .center .num{font-size:3rem;font-weight:700;letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+  .dial .center .unit{font-size:1.3rem;color:var(--dim);font-weight:500;margin-top:-4px}
+  .dial-scale{display:flex;justify-content:space-between;width:300px;margin-top:-26px;font-size:.85rem;color:var(--dim)}
+  .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px;position:relative;z-index:1}
+  .mode{
+    background:rgba(255,255,255,.6);border:none;border-radius:18px;cursor:pointer;
+    padding:18px 8px 14px;text-align:center;font:inherit;
+    transition:background .2s, box-shadow .2s;
+  }
+  .mode .mi{width:34px;height:34px;border-radius:11px;margin:0 auto 10px;display:grid;place-items:center;background:#f1efe9;transition:background .2s}
+  .mode .mi svg{width:17px;height:17px;stroke:#a9aaac;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+  .mode span{font-size:.88rem;font-weight:600;color:var(--dim);transition:color .2s}
+  .mode.on{background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.08)}
+  .mode.on .mi{background:var(--amber-soft)}
+  .mode.on .mi svg{stroke:var(--amber-deep)}
+  .mode.on span{color:var(--text)}
+  .save-wrap{margin-top:30px;position:relative;z-index:2}
+
+  /* toast */
+  .toast{
+    position:absolute;left:50%;bottom:calc(var(--nav-h) + 30px);transform:translate(-50%,20px);
+    background:#141513;color:#fff;padding:13px 22px;border-radius:14px;
+    font-size:.9rem;font-weight:500;opacity:0;pointer-events:none;z-index:60;
+    transition:opacity .3s, transform .3s;box-shadow:0 14px 30px rgba(0,0,0,.3);
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ============ ONBOARDING 1 ============ -->
+  <section class="screen full active ob" id="ob1">
+    <div class="topbar anim">
+      <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" width="26" height="26"><g fill="#f0b440"><rect x="3" y="3" width="8" height="8" rx="2.5" transform="rotate(8 7 7)"/><rect x="13" y="4" width="8" height="8" rx="2.5" transform="rotate(-6 17 8)"/><rect x="4" y="13" width="8" height="8" rx="2.5" transform="rotate(-7 8 17)"/><rect x="13" y="13" width="8" height="8" rx="2.5" transform="rotate(6 17 17)"/></g></svg></span>Solora</div>
+      <div class="spacer"></div>
+      <div class="ob-dots"><i class="on"></i><i></i><i></i><i></i></div>
+    </div>
+    <h1 class="anim">Connect Your<br>Solar System</h1>
+    <p class="anim">Add your inverter and battery to start tracking performance and savings.</p>
+
+    <div class="ob-photo"><img src="tetoSolar.png" alt="Solar roof"></div>
+
+    <div class="float-card" style="left:0;right:0;margin:0 auto;top:312px;width:248px;z-index:3">
+      <div class="row">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+        Solar Panel
+        <span style="margin-left:auto"><svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"/></svg></span>
+      </div>
+      <div class="val">5.2<small> kWh</small><span class="chip down">-0.6Wh</span></div>
+    </div>
+
+    <div class="ob-bottom">
+      <button class="cta light" onclick="goScreen('ob2')">Details Manually</button>
+      <button class="cta" onclick="goScreen('ob2')">Connect Device</button>
+    </div>
+  </section>
+
+  <!-- ============ ONBOARDING 2 ============ -->
+  <section class="screen full ob" id="ob2">
+    <div class="topbar anim">
+      <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" width="26" height="26"><g fill="#f0b440"><rect x="3" y="3" width="8" height="8" rx="2.5" transform="rotate(8 7 7)"/><rect x="13" y="4" width="8" height="8" rx="2.5" transform="rotate(-6 17 8)"/><rect x="4" y="13" width="8" height="8" rx="2.5" transform="rotate(-7 8 17)"/><rect x="13" y="13" width="8" height="8" rx="2.5" transform="rotate(6 17 17)"/></g></svg></span>Solora</div>
+      <div class="spacer"></div>
+      <div class="ob-dots"><i></i><i class="on"></i><i></i><i></i></div>
+    </div>
+    <h1 class="anim">Set Your<br>Electricity Rate</h1>
+    <p class="anim">We'll calculate your savings based on your local electricity costs.</p>
+
+    <div class="rate-wrap anim">
+      <div class="rate-val">$<span id="rateVal">0.18</span><small> / kWh</small></div>
+      <div class="ruler" id="ruler">
+        <div class="ticks" id="rulerTicks"></div>
+        <div class="needle"></div>
+      </div>
+    </div>
+
+    <div class="ob-bottom"><button class="cta" onclick="enterApp()">Continue →</button></div>
+  </section>
+
+  <!-- ============ HOME ============ -->
+  <section class="screen" id="home">
+    <div class="topbar anim">
+      <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" width="26" height="26"><g fill="#f0b440"><rect x="3" y="3" width="8" height="8" rx="2.5" transform="rotate(8 7 7)"/><rect x="13" y="4" width="8" height="8" rx="2.5" transform="rotate(-6 17 8)"/><rect x="4" y="13" width="8" height="8" rx="2.5" transform="rotate(-7 8 17)"/><rect x="13" y="13" width="8" height="8" rx="2.5" transform="rotate(6 17 17)"/></g></svg></span>Solora</div>
+      <div class="spacer"></div>
+      <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+      <div class="avatar">MS</div>
+    </div>
+
+    <div class="anim" onclick="goScreen('device')" style="cursor:pointer">
+      <h1 class="page">PowerVault X5</h1>
+      <div class="status">Normally</div>
+    </div>
+
+    <div class="flow anim">
+      <img src="casaCompleta.png" alt="House">
+      <svg class="links" viewBox="0 0 430 352" preserveAspectRatio="none">
+        <g stroke="rgba(255,255,255,.95)" stroke-width="2.5" fill="none" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.12))">
+          <path d="M215 96 V130"/>
+          <path d="M215 130 C215 156 152 146 134 172"/>
+          <path d="M215 130 C215 156 280 146 298 172"/>
+          <path d="M215 130 V216"/>
+        </g>
+      </svg>
+      <div class="node" style="left:0;right:0;margin:0 auto;width:max-content;top:30px" id="nodeSolar">
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></div>
+        <b id="vSolar">5.2 <small>kW</small></b>
+      </div>
+      <div class="node" style="left:9%;top:156px">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="15" height="9" rx="2.5"/><path d="M21 11v3M8.5 10.5 7 13h3l-1.5 2.5"/></svg></div>
+        <b id="vBatt">1.4 <small>kW</small></b>
+      </div>
+      <div class="node" style="right:9%;top:156px">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M6 21 12 3l6 18M7.5 16.5h9M9 12h6"/></svg></div>
+        <b id="vGrid">0.8 <small>kW</small></b>
+      </div>
+      <div class="node" style="left:0;right:0;margin:0 auto;width:max-content;top:202px">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21H3z"/><path d="M12 9.5 10.2 13h3.4L11.8 16.5"/></svg></div>
+        <b id="vHome">3.8 <small>kW</small></b>
+      </div>
+    </div>
+
+    <div class="grid2 anim">
+      <div class="card stat-mini">
+        <div class="label"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5z"/></svg>Today Produced</div>
+        <div class="val" id="todayProd">3.2<small>kWh</small><span class="chip up">+0.8kWh</span></div>
+      </div>
+      <div class="card stat-mini">
+        <div class="label"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.8 9.2c-.6-.8-1.6-1.2-2.8-1.2-1.7 0-3 .9-3 2.2 0 2.8 6 1.6 6 4.1 0 1.3-1.3 2.2-3 2.2-1.2 0-2.2-.4-2.8-1.2"/></svg>Today Income</div>
+        <div class="val" id="todayInc">$0.10<span class="chip up">+2.8%</span></div>
+      </div>
+    </div>
+
+    <div class="card alerts anim">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.5h.01"/></svg>Alerts
+        <button class="refresh" id="alertRefresh" style="margin-left:auto"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"/></svg></button>
+      </div>
+      <div class="alert-row">
+        <div class="alert-ic"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.5h.01"/></svg></div>
+        <div><div class="t1">String Output</div><div class="t2">Underperformance</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SOLAR ============ -->
+  <section class="screen" id="solar">
+    <div class="topbar anim">
+      <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" width="26" height="26"><g fill="#f0b440"><rect x="3" y="3" width="8" height="8" rx="2.5" transform="rotate(8 7 7)"/><rect x="13" y="4" width="8" height="8" rx="2.5" transform="rotate(-6 17 8)"/><rect x="4" y="13" width="8" height="8" rx="2.5" transform="rotate(-7 8 17)"/><rect x="13" y="13" width="8" height="8" rx="2.5" transform="rotate(6 17 17)"/></g></svg></span>Solora</div>
+      <div class="spacer"></div>
+      <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+      <div class="avatar">MS</div>
+    </div>
+
+    <div class="tabs anim" id="periodTabs">
+      <button data-p="1H">1H</button><button data-p="6H">6H</button>
+      <button data-p="1D" class="on">1D</button><button data-p="1W">1W</button><button data-p="1M">1M</button>
+    </div>
+
+    <div class="card anim">
+      <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>Solar production</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:12px">
+        <div class="big" id="solarVal">20.6<small>kWh</small></div>
+        <div class="conf">Confidence: <b id="solarConf">88%</b></div>
+      </div>
+      <div class="bars-chart" id="barsChart"></div>
+      <div class="xlabels" id="barLabels"></div>
+      <div class="scrub" id="solarScrub">
+        <div class="ticks"></div>
+        <div class="cursor" style="left:50%"></div>
+      </div>
+    </div>
+
+    <div class="card anim" style="margin-top:14px">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17.5 18a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 7 18z"/></svg>Climate Impact</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:12px;gap:10px;flex-wrap:wrap">
+        <div class="big" id="climateVal">8.2<small>kWh</small></div>
+        <div class="climate-stats">
+          <span><svg viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7a3 3 0 1 1-3 3"/></svg>2 m/s</span>
+          <span><svg viewBox="0 0 24 24"><path d="M17.5 14a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 7 14z"/><path d="M8 18v2M12 17v2M16 18v2"/></svg>22 mm</span>
+          <span><svg viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>26.7%</span>
+        </div>
+      </div>
+      <div class="line-chart"><svg id="climateChart" viewBox="0 0 380 130" preserveAspectRatio="none"></svg></div>
+      <div class="xlabels" id="climateLabels"></div>
+    </div>
+  </section>
+
+  <!-- ============ DEVICE / PERFORMANCE ============ -->
+  <section class="screen" id="device">
+    <div class="topbar anim">
+      <button class="iconbtn" onclick="goScreen('home')"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="spacer"></div>
+      <b style="font-size:1.15rem">PowerVault X5</b>
+      <div class="spacer"></div>
+      <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+    </div>
+
+    <div class="perf-head anim">
+      <div>
+        <div class="perf-label">Performance</div>
+        <div class="perf-val"><span id="perfVal">94</span><small>%</small></div>
+        <div class="kw-bars"><b>0.3</b><small>kW</small>
+          <span class="segs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>
+        </div>
+      </div>
+      <img class="perf-img" src="casaCompleta.png" alt="House">
+    </div>
+
+    <div class="card anim" style="margin-top:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.7 1.4 1.5 1.6 2.5h4.8c.2-1 .8-1.8 1.6-2.5A6 6 0 0 0 12 3z"/></svg>Extraction</div>
+        <button class="sel-today">Today <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:var(--dim);fill:none;stroke-width:2"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:12px;gap:10px;flex-wrap:wrap">
+        <div class="big" id="extrVal">20.8<small>kWh</small></div>
+        <div class="legend2">
+          <span><i style="background:#191a18"></i>Actual</span>
+          <span><i style="background:var(--amber)"></i>Expected</span>
+        </div>
+      </div>
+      <div class="line-chart"><svg id="extrChart" viewBox="0 0 380 110" preserveAspectRatio="none"></svg></div>
+      <div class="xlabels" id="extrLabels"></div>
+      <div class="scrub" id="extrScrub">
+        <div class="ticks"></div>
+        <div class="cursor" style="left:50%"></div>
+      </div>
+    </div>
+
+    <div class="metric-grid anim">
+      <div class="card stat-mini" style="background:var(--card-soft)">
+        <div class="label"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5z"/></svg>Produced</div>
+        <div class="val">28.6<small>kWh</small><span class="chip up">+0.6</span></div>
+      </div>
+      <div class="card stat-mini" style="background:var(--card-soft)">
+        <div class="label"><svg viewBox="0 0 24 24"><path d="M12 3v10M7 8a7 7 0 1 0 10 0"/></svg>Output</div>
+        <div class="val">24.1<small>kWh</small><span class="chip up">+0.8</span></div>
+      </div>
+      <div class="card stat-mini" style="background:linear-gradient(160deg,#fdf6e4,#faedc9)">
+        <div class="label"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Efficiency</div>
+        <div class="val">95<small>%</small><span class="chip up">+3.5%</span></div>
+      </div>
+      <div class="card stat-mini" style="background:linear-gradient(160deg,#fdf6e4,#faedc9)">
+        <div class="label"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12 7 9.5M12 12l3 4"/></svg>Ratio</div>
+        <div class="val">0.84<span class="chip up">+0.6%</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSIGHTS ============ -->
+  <section class="screen" id="insights">
+    <div class="topbar anim">
+      <div class="spacer"></div>
+      <b style="font-size:1.15rem">Financial Insights</b>
+      <div class="spacer"></div>
+      <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+    </div>
+
+    <div class="card anim">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M14.8 9.2c-.6-.8-1.6-1.2-2.8-1.2-1.7 0-3 .9-3 2.2 0 2.8 6 1.6 6 4.1 0 1.3-1.3 2.2-3 2.2-1.2 0-2.2-.4-2.8-1.2"/></svg>Cost saved</div>
+        <button class="sel-today">This Month <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:var(--dim);fill:none;stroke-width:2"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="big" style="margin-top:12px">$11.00</div>
+      <div class="line-chart"><svg id="costChart" viewBox="0 0 380 120" preserveAspectRatio="none"></svg></div>
+      <div class="xlabels"><span>01</span><span>06</span><span>12</span><span>18</span><span>24</span><span class="hl">28</span><span>31</span></div>
+    </div>
+
+    <div class="card anim" style="margin-top:14px">
+      <div class="card-title"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>ROI Progress</div>
+      <div class="big" style="margin-top:12px"><span id="roiVal">0</span><small>%</small></div>
+      <div class="roi-track">
+        <div class="roi-mark" id="roiMark" style="left:0%">$9,300</div>
+        <div class="roi-bar"><i id="roiBar" style="width:0%"></i></div>
+        <div class="roi-scale"><span>0</span><span>$15,000</span></div>
+      </div>
+    </div>
+
+    <div class="card anim" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>Payback Estimation</div>
+        <div class="conf">Confidence: <b style="color:var(--text)">2.1 y</b></div>
+      </div>
+      <div class="big" style="margin-top:12px">6.4<small>years</small></div>
+      <div class="payback-bars" id="paybackBars"></div>
+      <div class="xlabels"><span>0</span><span>1Y</span><span>2Y</span><span class="hl">3Y</span><span>4Y</span><span>5Y</span><span>6Y</span></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS / BATTERY ============ -->
+  <section class="screen" id="settings">
+    <div class="topbar anim">
+      <div class="spacer"></div>
+      <b style="font-size:1.15rem">Battery Reserve</b>
+      <div class="spacer"></div>
+      <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+    </div>
+
+    <div class="dial-wrap anim">
+      <div class="dial" id="dial">
+        <svg viewBox="0 0 270 270">
+          <g id="dialTicks"></g>
+          <circle id="dialTrack" cx="135" cy="135" r="100" fill="none" stroke="#e4e2dc" stroke-width="5" stroke-linecap="round"/>
+          <circle id="dialArc" cx="135" cy="135" r="100" fill="none" stroke="var(--amber)" stroke-width="5" stroke-linecap="round" transform="rotate(135 135 135)"/>
+          <circle id="dialKnob" r="9" fill="var(--amber-deep)" stroke="#fff" stroke-width="3.5"/>
+        </svg>
+        <div class="center">
+          <div class="num" id="whVal">860</div>
+          <div class="unit">Wh</div>
+        </div>
+      </div>
+      <div class="dial-scale"><span>0 Wh</span><span>1 kWh</span></div>
+    </div>
+
+    <div class="modes anim" id="modes">
+      <button class="mode on" data-m="Self-Use">
+        <div class="mi"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.7 1.4 1.5 1.6 2.5h4.8c.2-1 .8-1.8 1.6-2.5A6 6 0 0 0 12 3z"/></svg></div>
+        <span>Self-Use</span>
+      </button>
+      <button class="mode" data-m="Backup">
+        <div class="mi"><svg viewBox="0 0 24 24"><path d="M17.5 18a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 7 18z"/><path d="M12 11l-1.5 2.8h3L12 16.5"/></svg></div>
+        <span>Backup</span>
+      </button>
+      <button class="mode" data-m="Smart Mode">
+        <div class="mi"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="14" height="10" rx="3"/><path d="M21 10.5v3M8.5 9.5 7 12h3l-1.5 2.5"/></svg></div>
+        <span>Smart Mode</span>
+      </button>
+    </div>
+
+    <div class="save-wrap anim"><button class="cta" id="saveBtn">Save Changes</button></div>
+  </section>
+
+  <!-- bottom nav -->
+  <div class="navbar hidden" id="navbar">
+    <button data-s="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg></button>
+    <button data-s="solar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg></button>
+    <button data-s="insights"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></button>
+    <button data-s="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg></button>
+  </div>
+
+  <div class="toast" id="toast">Changes saved</div>
+</div>
+
+<script>
+/* ============== NAVIGATION ============== */
+const navbar=document.getElementById("navbar");
+let current="ob1";
+function goScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  const sc=document.getElementById(id);
+  sc.classList.add("active");
+  sc.scrollTop=0;
+  current=id;
+  const inApp=["home","solar","insights","settings","device"].includes(id);
+  navbar.classList.toggle("hidden",!inApp);
+  navbar.querySelectorAll("button").forEach(b=>
+    b.classList.toggle("on", b.dataset.s===id || (id==="device"&&b.dataset.s==="home")));
+  if(id==="solar") renderSolar();
+  if(id==="device") renderExtraction();
+  if(id==="insights") renderInsights();
+}
+function enterApp(){ goScreen("home"); }
+navbar.querySelectorAll("button").forEach(b=>b.onclick=()=>goScreen(b.dataset.s));
+
+/* ============== ONBOARDING: electricity rate ruler ============== */
+(function(){
+  const ruler=document.getElementById("ruler");
+  const ticks=document.getElementById("rulerTicks");
+  const out=document.getElementById("rateVal");
+  let rate=0.18, startX=0, startRate=0, drag=false;
+  const apply=()=>{
+    out.textContent=rate.toFixed(2);
+    ticks.style.backgroundPosition=`calc(50% - ${rate*800}px) center, calc(50% - ${rate*800}px) center`;
+  };
+  ruler.addEventListener("pointerdown",e=>{drag=true;startX=e.clientX;startRate=rate;ruler.setPointerCapture(e.pointerId);});
+  ruler.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    rate=Math.min(.6,Math.max(.05,startRate-(e.clientX-startX)/800));
+    apply();
+  });
+  ruler.addEventListener("pointerup",()=>drag=false);
+  apply();
+})();
+
+/* ============== SOLAR: bar chart per period ============== */
+const SOLAR={
+  "1H":{val:"1.8",conf:"95%",bars:[26,32,40,52,60,68,78],labels:["12:05","12:15","12:25","12:35","12:45","12:55","13:05"],hl:3},
+  "6H":{val:"11.4",conf:"91%",bars:[20,34,48,42,62,74,86],labels:["08:00","09:00","10:00","11:00","12:00","13:00","14:00"],hl:4},
+  "1D":{val:"20.6",conf:"88%",bars:[30,30,38,42,52,62,88],labels:["10:30","11:00","11:00","11:30","12:00","12:30","13:00"],hl:3},
+  "1W":{val:"128.4",conf:"82%",bars:[55,40,62,70,48,84,92],labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],hl:4},
+  "1M":{val:"512.7",conf:"76%",bars:[44,58,66,80],labels:["W1","W2","W3","W4"],hl:3}
+};
+let solarPeriod="1D";
+function renderSolar(){
+  const d=SOLAR[solarPeriod];
+  document.getElementById("solarVal").innerHTML=d.val+"<small>kWh</small>";
+  document.getElementById("solarConf").textContent=d.conf;
+  document.getElementById("barsChart").innerHTML=d.bars.map((h,i)=>
+    `<div class="bcol ${i===d.hl?"hl":""}" data-i="${i}"><div class="fill" style="height:${h}%;animation-delay:${i*70}ms"></div></div>`).join("");
+  document.getElementById("barLabels").innerHTML=d.labels.map((l,i)=>
+    `<span class="${i===d.hl?"hl":""}">${l}</span>`).join("");
+  renderClimate();
+}
+document.getElementById("periodTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  document.getElementById("periodTabs").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); solarPeriod=b.dataset.p; renderSolar();
+});
+/* tap a bar to highlight */
+document.getElementById("barsChart").addEventListener("click",e=>{
+  const col=e.target.closest(".bcol"); if(!col)return;
+  const i=+col.dataset.i, d=SOLAR[solarPeriod];
+  d.hl=i; renderSolar();
+});
+
+/* solar scrubber: drag updates value proportionally */
+function makeScrub(el,onMove){
+  const cur=el.querySelector(".cursor");
+  let drag=false;
+  const set=x=>{
+    const r=el.getBoundingClientRect();
+    const f=Math.min(1,Math.max(0,(x-r.left)/r.width));
+    cur.style.left=(f*100)+"%";
+    onMove(f);
+  };
+  el.addEventListener("pointerdown",e=>{drag=true;el.setPointerCapture(e.pointerId);set(e.clientX);});
+  el.addEventListener("pointermove",e=>drag&&set(e.clientX));
+  el.addEventListener("pointerup",()=>drag=false);
+}
+makeScrub(document.getElementById("solarScrub"),f=>{
+  const d=SOLAR[solarPeriod];
+  const base=parseFloat(d.val);
+  document.getElementById("solarVal").innerHTML=(base*(0.4+0.6*f)).toFixed(1)+"<small>kWh</small>";
+});
+
+/* ============== climate line chart ============== */
+function wavePath(W,H,pts){
+  let d=`M0,${pts[0]}`;
+  for(let i=1;i<pts.length;i++){
+    const x0=(i-1)/(pts.length-1)*W, x1=i/(pts.length-1)*W, cx=(x0+x1)/2;
+    d+=` C${cx},${pts[i-1]} ${cx},${pts[i]} ${x1},${pts[i]}`;
+  }
+  return d;
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function renderClimate(){
+  const svg=document.getElementById("climateChart");
+  const rnd=mulberry32(42);
+  let micro="";
+  for(let i=0;i<46;i++){
+    const x=4+i*8.2, h=25+rnd()*70;
+    micro+=`<rect x="${x}" y="${120-h}" width="3.2" height="${h}" rx="1.6" fill="#e9e7e2"/>`;
+  }
+  const pts=Array.from({length:14},(_,i)=>78-Math.sin(i*0.7+1)*18-rnd()*16);
+  svg.innerHTML=micro
+    +`<path d="${wavePath(380,130,pts)}" fill="none" stroke="var(--amber)" stroke-width="2"/>`
+    +`<line x1="190" y1="8" x2="190" y2="122" stroke="#191a18" stroke-width="2.2"/>`;
+  document.getElementById("climateLabels").innerHTML=
+    ["11:30","11:00","11:00","11:30","12:00","12:30","13:00"].map((l,i)=>
+    `<span class="${i===3?"hl":""}">${l}</span>`).join("");
+}
+
+/* ============== device extraction chart ============== */
+function renderExtraction(){
+  const svg=document.getElementById("extrChart");
+  const rnd=mulberry32(7);
+  const exp=Array.from({length:14},(_,i)=>62-Math.sin((i/13)*Math.PI)*34-rnd()*4);
+  const act=Array.from({length:14},(_,i)=>70-Math.sin((i/13)*Math.PI)*22-rnd()*5);
+  svg.innerHTML=
+    `<path d="${wavePath(380,110,exp)} L380,110 L0,110 Z" fill="rgba(240,180,64,.12)"/>`
+    +`<path d="${wavePath(380,110,exp)}" fill="none" stroke="var(--amber)" stroke-width="2"/>`
+    +`<path d="${wavePath(380,110,act)}" fill="none" stroke="#191a18" stroke-width="2"/>`
+    +`<line x1="0" y1="104" x2="380" y2="104" stroke="#e6e4df" stroke-width="1.5"/>`;
+  document.getElementById("extrLabels").innerHTML=
+    ["11:30","11:00","11:00","11:30","12:00","12:30","13:00"].map((l,i)=>
+    `<span class="${i===3?"hl":""}">${l}</span>`).join("");
+}
+makeScrub(document.getElementById("extrScrub"),f=>{
+  document.getElementById("extrVal").innerHTML=(12+f*14).toFixed(1)+"<small>kWh</small>";
+});
+
+/* ============== insights ============== */
+function renderInsights(){
+  /* --- Cost saved: area fill + animated line draw + day-28 marker --- */
+  const svg=document.getElementById("costChart");
+  const rnd=mulberry32(11);
+  const pts=Array.from({length:16},(_,i)=>98-(i*3.6)-Math.sin(i*1.25)*15-rnd()*7);
+  const markX=318, mi=Math.round(markX/380*15), markY=pts[mi];
+  const path=wavePath(380,120,pts);
+  svg.innerHTML=
+    `<path d="${path} L380,120 L0,120 Z" fill="rgba(240,180,64,.1)"/>`
+    +`<line x1="${markX}" y1="6" x2="${markX}" y2="114" stroke="#d8d6d0" stroke-width="1.6" stroke-dasharray="4 5"/>`
+    +`<path id="costLine" d="${path}" fill="none" stroke="var(--amber)" stroke-width="2.2"/>`
+    +`<circle cx="${markX}" cy="${markY}" r="5" fill="#fff" stroke="var(--amber-deep)" stroke-width="3" opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin=".9s" dur=".3s" fill="freeze"/>
+      </circle>`;
+  const line=document.getElementById("costLine");
+  const len=line.getTotalLength();
+  line.style.strokeDasharray=len; line.style.strokeDashoffset=len;
+  line.animate([{strokeDashoffset:len},{strokeDashoffset:0}],
+    {duration:1000,delay:150,easing:"cubic-bezier(.45,0,.25,1)",fill:"forwards"});
+
+  /* --- ROI: count-up + bar + traveling $9,300 marker --- */
+  const roi=62;
+  const bar=document.getElementById("roiBar"), mark=document.getElementById("roiMark");
+  bar.style.width="0%"; mark.style.left="0%";
+  animateCount(document.getElementById("roiVal"),roi,1000);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    bar.style.width=roi+"%"; mark.style.left=roi+"%";
+  }));
+
+  /* --- Payback: amber investment bar + green saving bands climbing each year --- */
+  const bands=[null,4,18,32,46,60,74]; /* bottom offset (%) per year */
+  document.getElementById("paybackBars").innerHTML=bands.map((b,i)=>{
+    if(i===0) return `<div class="pb"><div class="cap" style="height:100%;animation-delay:120ms"></div></div>`;
+    return `<div class="pb"><div class="band" style="bottom:${b}%;height:17%;animation-delay:${120+i*90}ms"></div></div>`;
+  }).join("");
+}
+function animateCount(el,target,dur){
+  const start=performance.now();
+  (function step(t){
+    const k=Math.min((t-start)/dur,1);
+    el.textContent=Math.round(target*(1-Math.pow(1-k,3)));
+    if(k<1) requestAnimationFrame(step);
+  })(start);
+}
+
+/* ============== battery dial ============== */
+(function(){
+  const R=100, CX=135, CY=135;
+  const START=135, SWEEP=270; /* degrees: gauge from 135° to 405° */
+  const CIRC=2*Math.PI*R;
+  const arc=document.getElementById("dialArc");
+  const knob=document.getElementById("dialKnob");
+  const ticksG=document.getElementById("dialTicks");
+  const out=document.getElementById("whVal");
+  let val=860; /* Wh, 0..1000 */
+
+  /* tick marks around */
+  let t="";
+  for(let i=0;i<=54;i++){
+    const a=(START+SWEEP*i/54)*Math.PI/180;
+    const r1=116, r2=i%9===0?130:124;
+    t+=`<line x1="${CX+Math.cos(a)*r1}" y1="${CY+Math.sin(a)*r1}" x2="${CX+Math.cos(a)*r2}" y2="${CY+Math.sin(a)*r2}" stroke="#dddbd5" stroke-width="2.5" stroke-linecap="round" data-i="${i}"/>`;
+  }
+  ticksG.innerHTML=t;
+  const tickEls=[...ticksG.querySelectorAll("line")];
+
+  arc.style.strokeDasharray=CIRC;
+  document.getElementById("dialTrack").setAttribute("stroke-dasharray",CIRC);
+  document.getElementById("dialTrack").setAttribute("stroke-dashoffset",CIRC*(1-SWEEP/360));
+  document.getElementById("dialTrack").setAttribute("transform",`rotate(${START} ${CX} ${CY})`);
+
+  function apply(animate){
+    const f=val/1000;
+    arc.style.transition=animate?"stroke-dashoffset .8s cubic-bezier(.3,.9,.3,1)":"none";
+    arc.style.strokeDashoffset=CIRC*(1-(SWEEP/360)*f);
+    const a=(START+SWEEP*f)*Math.PI/180;
+    knob.setAttribute("cx",CX+Math.cos(a)*R);
+    knob.setAttribute("cy",CY+Math.sin(a)*R);
+    out.textContent=Math.round(val);
+    tickEls.forEach((el,i)=>el.setAttribute("stroke", i/54<=f ? "var(--amber)" : "#dddbd5"));
+  }
+
+  const dial=document.getElementById("dial");
+  let drag=false;
+  function setFromPointer(e){
+    const r=dial.getBoundingClientRect();
+    const x=e.clientX-(r.left+r.width/2), y=e.clientY-(r.top+r.height/2);
+    let deg=Math.atan2(y,x)*180/Math.PI;     /* -180..180 */
+    deg=(deg-START+360*2)%360;               /* 0.. relative to start */
+    if(deg>SWEEP) deg = deg-SWEEP < (360-SWEEP)/2 ? SWEEP : 0; /* clamp in dead zone */
+    val=Math.round(deg/SWEEP*1000/10)*10;
+    apply(false);
+  }
+  dial.addEventListener("pointerdown",e=>{drag=true;dial.setPointerCapture(e.pointerId);setFromPointer(e);});
+  dial.addEventListener("pointermove",e=>drag&&setFromPointer(e));
+  dial.addEventListener("pointerup",()=>drag=false);
+  apply(true);
+})();
+
+/* modes + save */
+document.getElementById("modes").querySelectorAll(".mode").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".mode").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+});
+const toast=document.getElementById("toast");
+document.getElementById("saveBtn").onclick=()=>{
+  const mode=document.querySelector(".mode.on").dataset.m;
+  const wh=document.getElementById("whVal").textContent;
+  toast.textContent=`Saved: ${wh} Wh · ${mode}`;
+  toast.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>toast.classList.remove("show"),2200);
+};
+
+/* refresh spin */
+document.getElementById("alertRefresh").onclick=function(){
+  this.classList.remove("spin"); void this.offsetWidth; this.classList.add("spin");
+};
+
+/* initial renders */
+renderSolar();
+</script>
+</body>
+</html>
